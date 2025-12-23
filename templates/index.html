@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flask Chat</title>
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Inter, system-ui, sans-serif;
+}
+
+body {
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.chat-container {
+    width: 420px;
+    height: 600px;
+    background: rgba(20, 20, 30, 0.95);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+}
+
+.header {
+    padding: 16px;
+    text-align: center;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(90deg, #7f5af0, #2cb67d);
+    border-radius: 16px 16px 0 0;
+}
+.users {
+    padding: 10px;
+    font-size: 12px;
+    color: #aaa;
+    border-bottom: 1px solid #333;
+    max-height: 70px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+
+.users b {
+    color: #fff;
+    font-weight: 600;
+}
+.message img {
+    max-width: 220px;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+}
+
+
+.messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.message {
+    max-width: 75%;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.4;
+    animation: fadeIn 0.2s ease;
+}
+
+.self {
+    margin-left: auto;
+    background: linear-gradient(135deg, #7f5af0, #6246ea);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.other {
+    margin-right: auto;
+    background: #2a2a3c;
+    color: #eaeaea;
+    border-bottom-left-radius: 4px;
+}
+
+.username {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+
+.input-area {
+    display: flex;
+    padding: 12px;
+    gap: 8px;
+    background: #181826;
+    border-radius: 0 0 16px 16px;
+}
+.image-btn {
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 10px;
+    background: #26263a;
+    color: #fff;
+    font-size: 16px;
+    user-select: none;
+}
+
+input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: none;
+    outline: none;
+    background: #26263a;
+    color: white;
+}
+
+button {
+    padding: 10px 16px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, #7f5af0, #2cb67d);
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+
+<body>
+
+<div class="chat-container">
+<div class="users" id="users"></div>
+    <div class="header">Anonymous Chat</div>
+
+    <div class="messages" id="messages"></div>
+    <div id="typing" style="padding: 0 16px; font-size: 12px; color: #aaa;"></div>
+
+    <div class="input-area">
+    <label class="image-btn">
+        📷
+        <input type="file" id="imageInput" accept="image/*" hidden />
+    </label>
+
+    <input id="msg" placeholder="Type a message..." />
+    <button id="myBtn">Send</button>
+</div>
+
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+    const socket = io();
+
+    // SERVER-ASSIGNED USERNAME
+    let username = null;
+
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("msg");
+    const btn = document.getElementById("myBtn");
+    const typingDiv = document.getElementById("typing");
+    const usersDiv = document.getElementById("users");
+    const imageInput = document.getElementById("imageInput");
+
+    let typingTimeout = null;
+
+    /* ---------------- SERVER INIT ---------------- */
+
+    socket.on("init_user", data => {
+        username = data.user;
+        console.log("Assigned username:", username);
+    });
+
+    socket.on("users_update", users => {
+        usersDiv.innerHTML =
+            "<b>Online</b><br>" +
+            users.map(u => `<span>${u}</span>`).join("<br>");
+    });
+
+    /* ---------------- RECEIVE MESSAGE ---------------- */
+
+    socket.on("receive_message", data => {
+        const div = document.createElement("div");
+        div.classList.add(
+            "message",
+            data.user === username ? "self" : "other"
+        );
+
+        if (data.image) {
+            div.innerHTML = `
+                <div class="username">${data.user}</div>
+                <img src="${data.image}">
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="username">${data.user}</div>
+                ${data.msg}
+            `;
+        }
+
+        const shouldScroll =
+            messages.scrollTop + messages.clientHeight >=
+            messages.scrollHeight - 20;
+
+        messages.appendChild(div);
+        if (shouldScroll) div.scrollIntoView();
+    });
+
+    /* ---------------- SEND TEXT ---------------- */
+
+    function sendText() {
+        if (!input.value.trim()) return;
+
+        socket.emit("send_message", {
+            msg: input.value
+        });
+
+        socket.emit("stop_typing");
+        input.value = "";
+    }
+
+    btn.addEventListener("click", sendText);
+
+    document.addEventListener("keydown", e => {
+        if (e.key === "Enter") sendText();
+    });
+
+    /* ---------------- TYPING ---------------- */
+
+    input.addEventListener("input", () => {
+        socket.emit("typing");
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit("stop_typing");
+        }, 1000);
+    });
+
+    socket.on("user_typing", data => {
+        typingDiv.textContent = `${data.user} is typing...`;
+    });
+
+    socket.on("user_stop_typing", () => {
+        typingDiv.textContent = "";
+    });
+
+    /* ---------------- IMAGE SEND ---------------- */
+
+    imageInput.addEventListener("change", () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert("Image too large (max 2MB)");
+            imageInput.value = "";
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            socket.emit("send_message", {
+                image: reader.result
+            });
+        };
+
+        reader.readAsDataURL(file);
+        imageInput.value = "";
+    });
+
+});
+</script>
+
+
+
+</body>
+</html>
