@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 import random
@@ -11,7 +14,7 @@ app.config["SECRET_KEY"] = "secret!"
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="threading"
+    async_mode="eventlet"
 )
 
 # SID -> username (SERVER AUTHORITY)
