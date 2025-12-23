@@ -30,7 +30,19 @@ body {
     flex-direction: column;
     box-shadow: 0 20px 50px rgba(0,0,0,0.6);
 }
+.footer {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    padding: 6px 0;
+    background: #141424;
+    border-radius: 0 0 16px 16px;
+}
 
+.footer a {
+    color: #2cb67d;
+    text-decoration: none;
+}
 .header {
     padding: 16px;
     text-align: center;
@@ -161,6 +173,12 @@ button {
     <button id="myBtn">Send</button>
 </div>
 
+</div>
+
+
+<div class="footer">
+    By using this chat you agree to the
+    <a href="/terms" target="_blank">Terms</a>
 </div>
 <script>
 document.addEventListener("DOMContentLoaded", () => {

@@ -3,6 +3,7 @@ from flask_socketio import SocketIO, emit
 import random
 import html
 import re
+import os
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret!"
@@ -17,7 +18,7 @@ socketio = SocketIO(
 online_users = {}
 
 # --- CONFIG ---
-MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 2MB
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 ALLOWED_IMAGE_PREFIX = re.compile(r"^data:image/(png|jpeg|jpg|webp);base64,")
 
 # ---------------- ROUTES ----------------
@@ -25,6 +26,10 @@ ALLOWED_IMAGE_PREFIX = re.compile(r"^data:image/(png|jpeg|jpg|webp);base64,")
 @app.route("/")
 def index():
     return render_template("index.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
 
 # ---------------- SOCKET EVENTS ----------------
 
@@ -36,15 +41,10 @@ def on_connect():
     emit("init_user", {"user": username})
     emit("users_update", list(online_users.values()), broadcast=True)
 
-    print(f"[+] {username} connected")
-
 @socketio.on("disconnect")
 def on_disconnect():
-    user = online_users.pop(request.sid, None)
+    online_users.pop(request.sid, None)
     emit("users_update", list(online_users.values()), broadcast=True)
-
-    if user:
-        print(f"[-] {user} disconnected")
 
 @socketio.on("send_message")
 def handle_message(data):
@@ -55,33 +55,25 @@ def handle_message(data):
     msg = data.get("msg")
     image = data.get("image")
 
-    # --- TEXT MESSAGE ---
+    # TEXT
     if msg:
         safe_msg = html.escape(str(msg))[:1000]
-
         emit("receive_message", {
             "user": user,
             "msg": safe_msg
         }, broadcast=True)
 
-    # --- IMAGE MESSAGE ---
+    # IMAGE
     elif image:
-        if not isinstance(image, str):
-            return
-
-        # Validate base64 header
-        if not ALLOWED_IMAGE_PREFIX.match(image):
-            return
-
-        # Approx size check
-        image_size = len(image) * 3 // 4
-        if image_size > MAX_IMAGE_SIZE:
-            return
-
-        emit("receive_message", {
-            "user": user,
-            "image": image
-        }, broadcast=True)
+        if (
+            isinstance(image, str)
+            and ALLOWED_IMAGE_PREFIX.match(image)
+            and (len(image) * 3 // 4) <= MAX_IMAGE_SIZE
+        ):
+            emit("receive_message", {
+                "user": user,
+                "image": image
+            }, broadcast=True)
 
 @socketio.on("typing")
 def typing():
@@ -97,9 +89,10 @@ def stop_typing():
 # ---------------- RUN ----------------
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5001))
     socketio.run(
         app,
-        host="127.0.0.1",
-        port=5001,
+        host="0.0.0.0",
+        port=port,
         allow_unsafe_werkzeug=True
     )
