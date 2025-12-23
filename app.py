@@ -17,7 +17,7 @@ socketio = SocketIO(
 online_users = {}
 
 # --- CONFIG ---
-MAX_IMAGE_SIZE = 2 * 1024 * 1024  # 2MB
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 2MB
 ALLOWED_IMAGE_PREFIX = re.compile(r"^data:image/(png|jpeg|jpg|webp);base64,")
 
 # ---------------- ROUTES ----------------
